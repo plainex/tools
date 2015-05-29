@@ -1,0 +1,27 @@
+#!/bin/bash
+SAVEDAYS=7
+PREFIX=`date +%F`
+PROJECT=example
+REMOTESRV=8.8.8.8
+
+#Dump MySQL
+mkdir -p /backup/$PROJECT/$PREFIX/percona-mysql
+/usr/bin/innobackupex --user=root /backup/$PROJECT/$PREFIX/percona-mysql
+LASTBCKP=`find /backup/$PROJECT/$PREFIX/percona-mysql -mindepth 1 -maxdepth 1 -type d -printf "%P\n" | sort -nr | head -1`
+echo $LASTBCKP
+/usr/bin/innobackupex --user=root --apply-log /backup/$PROJECT/$PREFIX/percona-mysql/$LASTBCKP
+
+#Dump Redis
+mkdir -p /backup/$PROJECT/$PREFIX/redis
+cp /var/lib/redis/dump.rdb /backup/$PROJECT/$PREFIX/redis/dump-`date +%F--%H-%M`.rdb
+cd /backup/$PROJECT
+tar -cvf backup-$PREFIX.tar /backup/$PROJECT/$PREFIX
+scp -v -P333 /backup/$PROJECT/backup-$PREFIX.tar root@$REMOTESRV:/backup-all-db/$PROJECT/backup-$PREFIX.tar
+
+#Remove TEMP backups
+rm /backup/$PROJECT/backup-$PREFIX.tar
+
+#Remove old files
+cd /backup/$PROJECT
+find . -mtime $SAVEDAYS -exec rm -rf {} +;
+exit 0
